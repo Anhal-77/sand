@@ -19,9 +19,9 @@
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;direction:rtl;}
 body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(circle at 20% 20%,rgba(201,146,42,0.06) 0%,transparent 50%),radial-gradient(circle at 80% 80%,rgba(30,122,80,0.06) 0%,transparent 50%);pointer-events:none;z-index:0;}
-.geo{position:fixed;inset:0;opacity:.03;background-image:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23C9922A' stroke-width='0.5'%3E%3Cpolygon points='30,5 55,20 55,40 30,55 5,40 5,20'/%3E%3Cpolygon points='30,15 45,22.5 45,37.5 30,45 15,37.5 15,22.5'/%3E%3C/g%3E%3C/svg%3E");background-size:60px 60px;pointer-events:none;z-index:0;}
 
-.screen{display:none;position:relative;z-index:1;}
+
+.screen{display:none;position:relative;z-index:10;}
 .screen.active{display:flex;flex-direction:column;min-height:100vh;}
 
 /* HOME */
@@ -132,7 +132,7 @@ body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(
 </style>
 </head>
 <body>
-<div class="geo"></div>
+
 
 <!-- ── HOME ── -->
 <div class="screen active" id="s-home">
@@ -265,7 +265,7 @@ body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(
 // ═══════════════════════════════════════════════
 //  CONFIG — يتم حفظها في localStorage
 // ═══════════════════════════════════════════════
-let SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwPcfAJsdFGMTm23xKeVC79537bwOD8IPqNqkK6J5FVMBZjvlEJM8mCg6Nsuc3V4Uh6/exec";
+let SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxTvkNVXUIYcLI9Sl56SU_kGRTZr-CTgwle8Jp9RHs1gtCrm9DdeGmfErjmIAxGrZOS/exec";
 let groupCode  = null;
 let myId       = null;
 let myName     = null;
@@ -309,8 +309,18 @@ async function api(action, data={}) {
   // Build query string from all params
   const params = new URLSearchParams({ action, ...flattenData(data) });
   const url = `${SCRIPT_URL}?${params.toString()}`;
-  const res = await fetch(url, { redirect: 'follow' });
-  return await res.json();
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      redirect: 'follow',
+      mode: 'cors',
+    });
+    const text = await res.text();
+    return JSON.parse(text);
+  } catch(err) {
+    console.error('API error:', err);
+    return { error: err.toString() };
+  }
 }
 
 function flattenData(obj) {
