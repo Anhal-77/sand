@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Hajj Call-Sync | تزامن الحجاج</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <style>
+        :root {
+            --bg:       #080d1a;
+            --bg-card:  #0f1629;
+            --bg-input: #1a2340;
+            --primary:  #c9a84c;
+            --green:    #10b981;
+            --danger:   #ef4444;
+            --text:     #e2e8f0;
+            --muted:    #94a3b8;
+            --border:   #1e293b;
+            --r:        16px;
+        }
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; overflow: hidden; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        /* ── SCREENS ── */
+        .screen { display: none; position: fixed; inset: 0; flex-direction: column; overflow-y: auto; }
+        .screen.active { display: flex; }
+
+        /* ── HOME ── */
+        #screen-home {
+            background: linear-gradient(180deg, #080d1a 0%, #0f1629 60%, #0a1628 100%);
+            align-items: center; justify-content: center;
+            padding: 32px 24px; text-align: center; gap: 0;
+        }
+        #screen-home::before {
+            content: ''; position: absolute; inset: 0; pointer-events: none;
+            background:
+                radial-gradient(circle at 15% 15%, rgba(201,168,76,.07) 0%, transparent 55%),
+                radial-gradient(circle at 85% 80%, rgba(30,58,95,.18)   0%, transparent 55%);
+        }
+        .home-logo    { font-size: 72px; margin-bottom: 12px; filter: drop-shadow(0 0 24px rgba(201,168,76,.35)); }
+        .home-title   { font-size: 26px; font-weight: 700; color: var(--primary); margin-bottom: 6px; }
+        .home-sub     { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+        .home-tag     { font-size: 13px; color: var(--green); background: rgba(16,185,129,.12); padding: 6px 18px; border-radius: 20px; display: inline-block; margin-bottom: 36px; }
+        .btn-home {
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            width: 100%; max-width: 320px; padding: 17px 24px;
+            border-radius: var(--r); font-size: 17px; font-weight: 600;
+            cursor: pointer; border: none; transition: all .2s; margin-bottom: 14px;
+        }
+        .btn-create { background: linear-gradient(135deg, var(--primary), #a8862a); color: #000; box-shadow: 0 4px 20px rgba(201,168,76,.3); }
+        .btn-create:active { transform: translateY(-1px); box-shadow: 0 8px 28px rgba(201,168,76,.5); }
+        .btn-join   { background: var(--bg-card); color: var(--primary); border: 2px solid var(--primary); }
+        .btn-join:active { background: rgba(201,168,76,.1); }
+        .home-note  { color: var(--muted); font-size: 11px; max-width: 270px; margin-top: 16px; line-height: 1.7; }
+
+        /* ── FORM SCREENS ── */
+        .scr-header { display: flex; align-items: center; gap: 10px; padding: 18px 18px 0; flex-shrink: 0; }
+        .back-btn {
+            background: var(--bg-card); border: 1px solid var(--border); color: var(--text);
+            width: 40px; height: 40px; border-radius: 50%; font-size: 20px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .scr-title { font-size: 19px; font-weight: 700; color: var(--primary); }
+        .form-wrap { padding: 20px 18px; flex: 1; }
+        .fg { margin-bottom: 18px; }
+        .lbl { display: block; font-size: 13px; color: var(--muted); margin-bottom: 7px; font-weight: 500; }
+        .inp {
+            width: 100%; padding: 14px 15px; background: var(--bg-input);
+            border: 1px solid var(--border); border-radius: 12px;
+            color: var(--text); font-size: 16px; outline: none; transition: border-color .2s; text-align: right;
+        }
+        .inp:focus { border-color: var(--primary); }
+        .inp::placeholder { color: var(--muted); }
+        .code-box { background: var(--bg-input); border: 2px solid var(--primary); border-radius: 12px; padding: 18px; text-align: center; }
+        .code-num { font-size: 38px; font-weight: 700; color: var(--primary); letter-spacing: 9px; font-family: monospace; }
+        .code-lbl { font-size: 11px; color: var(--muted); margin-top: 4px; }
+        .chk-row {
+            display: flex; align-items: center; gap: 12px;
+            background: var(--bg-input); border: 1px solid var(--border);
+            border-radius: 12px; padding: 15px; cursor: pointer;
+        }
+        .chk-row input { width: 22px; height: 22px; accent-color: var(--primary); cursor: pointer; }
+        .chk-lbl { font-size: 15px; flex: 1; }
+        .btn-primary {
+            width: 100%; padding: 15px; background: linear-gradient(135deg, var(--primary), #a8862a);
+            color: #000; border: none; border-radius: var(--r);
+            font-size: 17px; font-weight: 700; cursor: pointer; transition: all .2s; margin-top: 6px;
+        }
+        .btn-primary:active { transform: scale(.98); }
+        .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+        /* ── WAITING ── */
+        .wait-info { padding: 14px 18px; display: flex; gap: 12px; }
+        .info-card { flex: 1; background: var(--bg-card); border-radius: 12px; padding: 14px; text-align: center; border: 1px solid var(--border); }
+        .ic-lbl { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+        .ic-val { font-size: 22px; font-weight: 700; color: var(--primary); letter-spacing: 4px; font-family: monospace; }
+        .qr-sec { padding: 0 18px 14px; display: flex; flex-direction: column; align-items: center; }
+        .qr-wrap { background: #fff; padding: 10px; border-radius: 10px; margin-bottom: 6px; }
+        .qr-hint { font-size: 11px; color: var(--muted); }
+        .mem-sec { padding: 0 18px; flex: 1; }
+        .sec-title { font-size: 13px; color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+        .live-dot { width: 8px; height: 8px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+        .mem-item { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 11px 14px; margin-bottom: 7px; display: flex; align-items: center; gap: 11px; }
+        .mem-av { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; color: #fff; flex-shrink: 0; }
+        .mem-name { flex: 1; font-weight: 600; font-size: 15px; }
+        .badges { display: flex; gap: 5px; }
+        .badge { font-size: 10px; padding: 3px 8px; border-radius: 20px; font-weight: 600; }
+        .badge-l { background: rgba(201,168,76,.2); color: var(--primary); }
+        .badge-d { background: rgba(16,185,129,.2); color: var(--green); }
+        .btn-start { margin: 14px 18px; width: calc(100% - 36px); }
+
+        /* ── MAP ── */
+        #screen-map { overflow: hidden; }
+        .map-hdr {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 14px; background: var(--bg-card); border-bottom: 1px solid var(--border);
+            flex-shrink: 0; z-index: 100;
+        }
+        .map-title { font-size: 13px; font-weight: 600; color: var(--muted); }
+        .live-ind { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--green); }
+        .exit-btn { background: var(--bg-input); border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer; }
+        #map { flex: 1; min-height: 0; }
+        .map-body { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+        .btn-sos {
+            position: absolute; top: 12px; left: 14px; z-index: 1000;
+            background: var(--danger); color: #fff; border: none; border-radius: 50px;
+            padding: 11px 22px; font-size: 15px; font-weight: 700; cursor: pointer;
+            box-shadow: 0 4px 20px rgba(239,68,68,.5);
+            animation: sos-pulse 2.2s infinite;
+        }
+        @keyframes sos-pulse {
+            0%,100%{ box-shadow: 0 4px 20px rgba(239,68,68,.5); }
+            50%{ box-shadow: 0 4px 28px rgba(239,68,68,.8), 0 0 0 8px rgba(239,68,68,.18); }
+        }
+        .mem-panel { background: var(--bg-card); border-top: 1px solid var(--border); max-height: 210px; overflow-y: auto; flex-shrink: 0; }
+        .mem-panel-hdr { padding: 8px 14px 2px; font-size: 11px; color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--bg-card); }
+        .mem-row { display: flex; align-items: center; gap: 9px; padding: 9px 14px; border-bottom: 1px solid var(--border); }
+        .mem-row:last-child { border-bottom: none; }
+        .mem-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+        .mem-row-name { flex: 1; font-size: 14px; font-weight: 600; }
+        .mem-dist { font-size: 11px; color: var(--muted); min-width: 55px; text-align: center; }
+        .dir-btn {
+            width: 30px; height: 30px; background: var(--bg-input); border: 1px solid var(--border);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; color: var(--primary); font-size: 15px; transition: background .2s; flex-shrink: 0;
+        }
+        .dir-btn:active { background: rgba(201,168,76,.2); }
+
+        /* ── SOS OVERLAY ── */
+        #sos-overlay {
+            position: fixed; inset: 0; background: rgba(239,68,68,.95);
+            display: none; align-items: center; justify-content: center;
+            flex-direction: column; z-index: 9999;
+            animation: flash .6s ease;
+        }
+        #sos-overlay.active { display: flex; }
+        @keyframes flash { 0%,100%{opacity:1} 50%{opacity:.75} }
+        .sos-icon { font-size: 80px; animation: bounce 1s ease infinite; }
+        @keyframes bounce { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+        .sos-who  { font-size: 26px; font-weight: 700; color: #fff; margin-top: 14px; }
+        .sos-txt  { font-size: 17px; color: rgba(255,255,255,.9); margin-top: 6px; }
+        .sos-cd   { margin-top: 20px; color: rgba(255,255,255,.7); font-size: 13px; }
+        .sos-dismiss {
+            margin-top: 24px; background: rgba(255,255,255,.2); border: 2px solid rgba(255,255,255,.5);
+            color: #fff; border-radius: 50px; padding: 10px 28px; font-size: 15px; cursor: pointer;
+        }
+
+        /* ── LOADING ── */
+        #loading { position: fixed; inset: 0; background: rgba(8,13,26,.82); display: none; align-items: center; justify-content: center; z-index: 9998; flex-direction: column; gap: 14px; }
+        #loading.active { display: flex; }
+        .spinner { width: 46px; height: 46px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .75s linear infinite; }
+        @keyframes spin { to{transform:rotate(360deg)} }
+        .loading-txt { color: var(--muted); font-size: 13px; }
+
+        /* ── TOAST ── */
+        #toast {
+            position: fixed; bottom: 72px; left: 50%; transform: translateX(-50%) translateY(20px);
+            background: var(--bg-card); border: 1px solid var(--border); color: var(--text);
+            padding: 11px 22px; border-radius: 50px; font-size: 13px; opacity: 0;
+            transition: all .3s; z-index: 9997; white-space: nowrap; max-width: 92vw; text-align: center;
+        }
+        #toast.show         { opacity: 1; transform: translateX(-50%) translateY(0); }
+        #toast.show.success { border-color: var(--green); color: var(--green); }
+        #toast.show.error   { border-color: var(--danger); color: var(--danger); }
+
+        /* ── MISC ── */
+        .hidden { display: none !important; }
+        .leaflet-container { background: #1a1a2e; }
+        ::-webkit-scrollbar { width: 3px; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     HOME
+══════════════════════════════════════════════ -->
+<div id="screen-home" class="screen active">
+    <div class="home-logo">🕌</div>
+    <div class="home-title">Hajj Call-Sync</div>
+    <div class="home-sub">تزامن الحجاج</div>
+    <div class="home-tag">🤟 مصمم للصم وضعاف السمع</div>
+
+    <button class="btn-home btn-create" onclick="goCreate()">
+        <span>➕</span><span>إنشاء مجموعة جديدة</span>
+    </button>
+    <button class="btn-home btn-join" onclick="showScreen('join')">
+        <span>🔗</span><span>انضمام لمجموعة</span>
+    </button>
+
+    <p class="home-note">لا يحتاج تنزيل · لا يحتاج تسجيل · يعمل بدون إنترنت (GPS)</p>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     CREATE
+══════════════════════════════════════════════ -->
+<div id="screen-create" class="screen">
+    <div class="scr-header">
+        <button class="back-btn" onclick="showScreen('home')">←</button>
+        <div class="scr-title">إنشاء مجموعة جديدة</div>
+    </div>
+    <div class="form-wrap">
+        <div class="fg">
+            <label class="lbl">اسمك</label>
+            <input type="text" id="create-name" class="inp" placeholder="أدخل اسمك" maxlength="30">
+        </div>
+        <div class="fg">
+            <div class="code-box">
+                <div class="code-num" id="gen-code">------</div>
+                <div class="code-lbl">رمز المجموعة (يُولَّد تلقائياً)</div>
+            </div>
+        </div>
+        <div class="fg">
+            <label class="chk-row" for="create-deaf">
+                <input type="checkbox" id="create-deaf">
+                <span class="chk-lbl">أنا أصم أو ضعيف السمع 🤟</span>
+            </label>
+        </div>
+        <button class="btn-primary" onclick="doCreateGroup()">إنشاء المجموعة</button>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     JOIN
+══════════════════════════════════════════════ -->
+<div id="screen-join" class="screen">
+    <div class="scr-header">
+        <button class="back-btn" onclick="showScreen('home')">←</button>
+        <div class="scr-title">انضمام لمجموعة</div>
+    </div>
+    <div class="form-wrap">
+        <div class="fg">
+            <label class="lbl">اسمك</label>
+            <input type="text" id="join-name" class="inp" placeholder="أدخل اسمك" maxlength="30">
+        </div>
+        <div class="fg">
+            <label class="lbl">رمز المجموعة (6 أرقام)</label>
+            <input type="text" id="join-code" class="inp"
+                   placeholder="000000" maxlength="6"
+                   inputmode="numeric" pattern="[0-9]*"
+                   style="text-align:center;font-size:30px;letter-spacing:10px;font-family:monospace;">
+        </div>
+        <div class="fg">
+            <label class="chk-row" for="join-deaf">
+                <input type="checkbox" id="join-deaf">
+                <span class="chk-lbl">أنا أصم أو ضعيف السمع 🤟</span>
+            </label>
+        </div>
+        <button class="btn-primary" onclick="doJoinGroup()">انضمام</button>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     WAITING ROOM
+══════════════════════════════════════════════ -->
+<div id="screen-waiting" class="screen">
+    <div class="scr-header">
+        <button class="back-btn" onclick="doLeave()">←</button>
+        <div class="scr-title">غرفة الانتظار</div>
+    </div>
+
+    <div class="wait-info">
+        <div class="info-card">
+            <div class="ic-lbl">رمز المجموعة</div>
+            <div class="ic-val" id="wait-code">------</div>
+        </div>
+        <div class="info-card" style="flex:.65;">
+            <div class="ic-lbl">الأعضاء</div>
+            <div class="ic-val" id="wait-count" style="letter-spacing:0;">0</div>
+        </div>
+    </div>
+
+    <div class="qr-sec">
+        <div class="qr-wrap"><div id="qr-code"></div></div>
+        <p class="qr-hint">📷 امسح QR لمشاركة رابط الانضمام</p>
+    </div>
+
+    <div class="mem-sec">
+        <div class="sec-title"><div class="live-dot"></div><span>الأعضاء المتصلون</span></div>
+        <div id="wait-members"></div>
+    </div>
+
+    <button class="btn-primary btn-start" onclick="doStartTracking()">🗺️ بدء التتبع</button>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     MAP
+══════════════════════════════════════════════ -->
+<div id="screen-map" class="screen">
+    <div class="map-hdr">
+        <div class="map-title" id="map-grp-title">المجموعة: ------</div>
+        <div class="live-ind"><div class="live-dot"></div><span>مباشر</span></div>
+        <button class="exit-btn" onclick="doLeave()">خروج</button>
+    </div>
+
+    <div class="map-body">
+        <div id="map"></div>
+        <button class="btn-sos" onclick="doSendSOS()">🆘 استغاثة</button>
+    </div>
+
+    <div class="mem-panel">
+        <div class="mem-panel-hdr">أفراد المجموعة</div>
+        <div id="map-members"></div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     SOS OVERLAY
+══════════════════════════════════════════════ -->
+<div id="sos-overlay">
+    <div class="sos-icon">🚨</div>
+    <div class="sos-who" id="sos-name"></div>
+    <div class="sos-txt">يطلب المساعدة!</div>
+    <div class="sos-cd">يُغلق تلقائياً خلال <span id="sos-cd">15</span> ثانية</div>
+    <button class="sos-dismiss" onclick="hideSOSOverlay()">إغلاق</button>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     LOADING + TOAST
+══════════════════════════════════════════════ -->
+<div id="loading"><div class="spinner"></div><div class="loading-txt" id="load-txt">جارٍ التحميل...</div></div>
+<div id="toast"></div>
+
+<!-- ═══════════════════════════════════════════
+     SCRIPTS
+══════════════════════════════════════════════ -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN2GqBc=" crossorigin=""></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+// ═══════════════════════════════════════════
+// CONFIG  ← ضع هنا رابط Google Apps Script
+// ═══════════════════════════════════════════
+const API_URL = 'https://script.google.com/macros/s/AKfycbx8K5sqGXhwl6SU9GwB40rC-Qho5Sm1p4z0sBH7v40Yel8ksNQ0YawaPbkWCe2LJTNV/exec';
+
+const COLORS = [
+    '#FF6B6B','#4ECDC4','#45B7D1','#96CEB4',
+    '#FFEAA7','#DDA0DD','#98FB98','#FFB347',
+    '#87CEEB','#F0A500','#A8E6CF','#FF8B94'
+];
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+const S = {
+    groupCode:  null, memberId: null,
+    memberName: null, isDeaf:   false, isLeader: false,
+    map:        null, markers:  {},    members: [],
+    pollInt:    null, watchId:  null,
+    lat: null,  lng: null,
+    mapReady:   false,
+    sosActive:  false, sosTimer: null,
+    sosAlertShown: new Set()
+};
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+    const p = new URLSearchParams(window.location.search);
+    const joinCode = p.get('join');
+    if (joinCode) {
+        showScreen('join');
+        document.getElementById('join-code').value = joinCode;
+    }
+    freshCode();
+});
+
+function freshCode() {
+    const c = String(Math.floor(100000 + Math.random() * 900000));
+    document.getElementById('gen-code').textContent = c;
+    return c;
+}
+
+// ═══════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════
+function showScreen(name) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-' + name).classList.add('active');
+}
+function goCreate() {
+    freshCode();
+    showScreen('create');
+}
+
+// ═══════════════════════════════════════════
+// API CALL
+// ═══════════════════════════════════════════
+async function call(params) {
+    const url = API_URL + '?' + new URLSearchParams(params);
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+}
+
+// ═══════════════════════════════════════════
+// CREATE GROUP
+// ═══════════════════════════════════════════
+async function doCreateGroup() {
+    const name = document.getElementById('create-name').value.trim();
+    if (!name) { toast('يرجى إدخال اسمك', 'error'); return; }
+
+    const code  = document.getElementById('gen-code').textContent;
+    const deaf  = document.getElementById('create-deaf').checked;
+
+    loading('جارٍ إنشاء المجموعة...');
+    try {
+        const r = await call({ action: 'createGroup', groupCode: code, name, isDeaf: deaf, isLeader: true });
+        if (r.success) {
+            S.groupCode  = code;
+            S.memberId   = r.memberId;
+            S.memberName = name;
+            S.isDeaf     = deaf;
+            S.isLeader   = true;
+            hideLoading();
+            enterWaiting();
+        } else {
+            hideLoading();
+            toast('خطأ: ' + (r.error || 'غير معروف'), 'error');
+        }
+    } catch { hideLoading(); toast('تعذر الاتصال بالخادم', 'error'); }
+}
+
+// ═══════════════════════════════════════════
+// JOIN GROUP
+// ═══════════════════════════════════════════
+async function doJoinGroup() {
+    const name = document.getElementById('join-name').value.trim();
+    const code = document.getElementById('join-code').value.trim();
+    const deaf = document.getElementById('join-deaf').checked;
+
+    if (!name)                         { toast('يرجى إدخال اسمك', 'error');               return; }
+    if (!/^\d{6}$/.test(code))         { toast('الرمز يجب أن يكون 6 أرقام', 'error');      return; }
+
+    loading('جارٍ الانضمام...');
+    try {
+        const r = await call({ action: 'joinGroup', groupCode: code, name, isDeaf: deaf });
+        if (r.success) {
+            S.groupCode  = code;
+            S.memberId   = r.memberId;
+            S.memberName = name;
+            S.isDeaf     = deaf;
+            S.isLeader   = false;
+            hideLoading();
+            enterWaiting();
+        } else {
+            hideLoading();
+            toast('خطأ في الانضمام: ' + (r.error || ''), 'error');
+        }
+    } catch { hideLoading(); toast('تعذر الاتصال بالخادم', 'error'); }
+}
+
+// ═══════════════════════════════════════════
+// WAITING ROOM
+// ═══════════════════════════════════════════
+function enterWaiting() {
+    document.getElementById('wait-code').textContent       = S.groupCode;
+    document.getElementById('map-grp-title').textContent   = 'المجموعة: ' + S.groupCode;
+
+    // QR
+    document.getElementById('qr-code').innerHTML = '';
+    const link = location.origin + location.pathname + '?join=' + S.groupCode;
+    try {
+        new QRCode(document.getElementById('qr-code'), {
+            text: link, width: 156, height: 156,
+            colorDark: '#000', colorLight: '#fff',
+            correctLevel: QRCode.CorrectLevel.M
+        });
+    } catch(e) { console.error('QR:', e); }
+
+    showScreen('waiting');
+    pollWaiting();
+    S.pollInt = setInterval(pollWaiting, 4000);
+}
+
+async function pollWaiting() {
+    try {
+        const r = await call({ action: 'getMembers', code: S.groupCode });
+        if (!r.success) return;
+        S.members = r.members;
+        document.getElementById('wait-count').textContent = r.members.length;
+        renderWaitList(r.members);
+    } catch { /* silent */ }
+}
+
+function renderWaitList(members) {
+    const el = document.getElementById('wait-members');
+    el.innerHTML = '';
+    members.forEach((m, i) => {
+        const color = COLORS[i % COLORS.length];
+        const me    = m.memberId === S.memberId;
+        const div   = document.createElement('div');
+        div.className = 'mem-item';
+        div.innerHTML = `
+            <div class="mem-av" style="background:${color}">${m.name.charAt(0)}</div>
+            <div class="mem-name">${m.name}${me ? ' (أنت)' : ''}</div>
+            <div class="badges">
+                ${isBool(m.isLeader) ? '<span class="badge badge-l">قائد</span>' : ''}
+                ${isBool(m.isDeaf)   ? '<span class="badge badge-d">🤟</span>'   : ''}
+            </div>`;
+        el.appendChild(div);
+    });
+}
+
+// ═══════════════════════════════════════════
+// START TRACKING
+// ═══════════════════════════════════════════
+function doStartTracking() {
+    clearInterval(S.pollInt); S.pollInt = null;
+    showScreen('map');
+    initMap();
+    startGPS();
+    S.pollInt = setInterval(pollMap, 5000);
+    pollMap();
+}
+
+// ═══════════════════════════════════════════
+// MAP
+// ═══════════════════════════════════════════
+function initMap() {
+    if (S.map) { S.map.remove(); S.map = null; }
+    S.markers  = {};
+    S.mapReady = false;
+
+    S.map = L.map('map', { center: [21.3891, 39.8579], zoom: 15, zoomControl: true, attributionControl: false });
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© CartoDB', maxZoom: 20, subdomains: 'abcd'
+    }).addTo(S.map);
+}
+
+function mkIcon(color, isMe, initial) {
+    const sz = isMe ? 42 : 34;
+    const outline = isMe ? `outline:3px solid ${color};outline-offset:3px;` : '';
+    return L.divIcon({
+        html: `<div style="
+            width:${sz}px;height:${sz}px;background:${color};
+            border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+            border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.5);
+            display:flex;align-items:center;justify-content:center;${outline}">
+            <span style="transform:rotate(45deg);color:#fff;font-weight:700;font-size:${isMe?15:12}px;">${initial}</span>
+        </div>`,
+        className: '', iconSize: [sz, sz], iconAnchor: [sz/4, sz]
+    });
+}
+
+function putMarker(m, i) {
+    const lat = parseFloat(m.lat), lng = parseFloat(m.lng);
+    if (isNaN(lat) || isNaN(lng)) return;
+    const color = COLORS[i % COLORS.length];
+    const isMe  = m.memberId === S.memberId;
+    const icon  = mkIcon(color, isMe, m.name.charAt(0));
+    if (S.markers[m.memberId]) {
+        S.markers[m.memberId].setLatLng([lat, lng]).setIcon(icon);
+    } else {
+        S.markers[m.memberId] = L.marker([lat, lng], { icon })
+            .addTo(S.map)
+            .bindPopup(`<strong>${m.name}</strong>${isBool(m.isDeaf)?' 🤟':''}`);
+    }
+}
+
+// ═══════════════════════════════════════════
+// GPS
+// ═══════════════════════════════════════════
+function startGPS() {
+    if (!navigator.geolocation) { toast('GPS غير متاح', 'error'); return; }
+    const opt = { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 };
+    navigator.geolocation.getCurrentPosition(onGPS, onGPSErr, opt);
+    S.watchId = navigator.geolocation.watchPosition(onGPS, onGPSErr, opt);
+}
+
+function onGPS(pos) {
+    S.lat = pos.coords.latitude;
+    S.lng = pos.coords.longitude;
+    call({ action: 'updateLocation', groupCode: S.groupCode, memberId: S.memberId, lat: S.lat, lng: S.lng }).catch(()=>{});
+    if (!S.mapReady && S.map) {
+        S.map.setView([S.lat, S.lng], 17);
+        S.mapReady = true;
+    }
+}
+function onGPSErr(e) { console.warn('GPS:', e.message); }
+
+// ═══════════════════════════════════════════
+// MAP POLL
+// ═══════════════════════════════════════════
+async function pollMap() {
+    try {
+        const r = await call({ action: 'getMembers', code: S.groupCode });
+        if (!r.success) return;
+        S.members = r.members;
+
+        const ids = r.members.map(m => m.memberId);
+        Object.keys(S.markers).forEach(id => {
+            if (!ids.includes(id)) { S.map.removeLayer(S.markers[id]); delete S.markers[id]; }
+        });
+
+        r.members.forEach((m, i) => putMarker(m, i));
+        renderMapList(r.members);
+
+        // SOS check
+        r.members.forEach(m => {
+            if (m.sos && m.sos !== '' && !S.sosAlertShown.has(m.sos + m.memberId) && m.memberId !== S.memberId) {
+                S.sosAlertShown.add(m.sos + m.memberId);
+                showSOSOverlay(m.name);
+            }
+        });
+    } catch { /* silent */ }
+}
+
+function renderMapList(members) {
+    const el = document.getElementById('map-members');
+    el.innerHTML = '';
+    members.forEach((m, i) => {
+        const color = COLORS[i % COLORS.length];
+        const isMe  = m.memberId === S.memberId;
+        let dist = '---', bearing = 0;
+        if (S.lat && S.lng && m.lat && m.lng) {
+            const d = haversine(S.lat, S.lng, +m.lat, +m.lng);
+            if (!isNaN(d)) {
+                dist    = d < 1000 ? Math.round(d) + ' م' : (d/1000).toFixed(1) + ' كم';
+                bearing = getBearing(S.lat, S.lng, +m.lat, +m.lng);
+            }
+        }
+        const row = document.createElement('div');
+        row.className = 'mem-row';
+        row.innerHTML = `
+            <div class="mem-dot" style="background:${color}"></div>
+            <div class="mem-row-name">${m.name}${isMe?' ✓':''}${isBool(m.isDeaf)?' 🤟':''}</div>
+            <div class="mem-dist">${dist}</div>
+            ${!isMe && m.lat
+                ? `<button class="dir-btn" onclick="flyTo(${m.lat},${m.lng})" style="transform:rotate(${bearing}deg)">↑</button>`
+                : `<div style="width:30px"></div>`}`;
+        el.appendChild(row);
+    });
+}
+
+function flyTo(lat, lng) {
+    if (S.map) S.map.flyTo([lat, lng], 18, { duration: 1.5 });
+}
+
+// ═══════════════════════════════════════════
+// SOS
+// ═══════════════════════════════════════════
+async function doSendSOS() {
+    if (!S.lat) { toast('في انتظار GPS...', 'error'); return; }
+    if (navigator.vibrate) navigator.vibrate([500,200,500,200,500]);
+    try {
+        await call({ action: 'sendSOS', groupCode: S.groupCode, memberId: S.memberId, name: S.memberName, lat: S.lat, lng: S.lng });
+        toast('تم إرسال الاستغاثة 🚨', 'success');
+        setTimeout(() => {
+            call({ action: 'clearSOS', groupCode: S.groupCode, memberId: S.memberId }).catch(()=>{});
+        }, 15000);
+    } catch { toast('تعذر إرسال الاستغاثة', 'error'); }
+}
+
+function showSOSOverlay(name) {
+    S.sosActive = true;
+    document.getElementById('sos-name').textContent = name;
+    document.getElementById('sos-overlay').classList.add('active');
+    if (navigator.vibrate) navigator.vibrate([500,200,500,200,500]);
+    let cd = 15;
+    document.getElementById('sos-cd').textContent = cd;
+    S.sosTimer = setInterval(() => {
+        cd--;
+        document.getElementById('sos-cd').textContent = cd;
+        if (cd <= 0) hideSOSOverlay();
+    }, 1000);
+}
+
+function hideSOSOverlay() {
+    document.getElementById('sos-overlay').classList.remove('active');
+    S.sosActive = false;
+    if (S.sosTimer) { clearInterval(S.sosTimer); S.sosTimer = null; }
+}
+
+// ═══════════════════════════════════════════
+// LEAVE
+// ═══════════════════════════════════════════
+function doLeave() {
+    clearInterval(S.pollInt); S.pollInt = null;
+    if (S.watchId != null) { navigator.geolocation.clearWatch(S.watchId); S.watchId = null; }
+    if (S.groupCode && S.memberId)
+        call({ action: 'leaveGroup', groupCode: S.groupCode, memberId: S.memberId }).catch(()=>{});
+    if (S.map) { S.map.remove(); S.map = null; }
+    Object.assign(S, { groupCode:null, memberId:null, memberName:null, members:[], markers:{}, mapReady:false, sosActive:false, lat:null, lng:null, sosAlertShown: new Set() });
+    showScreen('home');
+    window.history.replaceState({}, '', location.pathname);
+}
+
+// ═══════════════════════════════════════════
+// MATH
+// ═══════════════════════════════════════════
+function haversine(lat1,lng1,lat2,lng2) {
+    const R=6371000, φ1=lat1*Math.PI/180, φ2=lat2*Math.PI/180,
+          dφ=(lat2-lat1)*Math.PI/180, dλ=(lng2-lng1)*Math.PI/180;
+    const a = Math.sin(dφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(dλ/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function getBearing(lat1,lng1,lat2,lng2) {
+    const φ1=lat1*Math.PI/180, φ2=lat2*Math.PI/180, dλ=(lng2-lng1)*Math.PI/180;
+    const y=Math.sin(dλ)*Math.cos(φ2);
+    const x=Math.cos(φ1)*Math.sin(φ2)-Math.sin(φ1)*Math.cos(φ2)*Math.cos(dλ);
+    return (Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+
+function isBool(v) { return v === true || v === 'true'; }
+
+// ═══════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════
+function loading(txt) {
+    document.getElementById('load-txt').textContent = txt||'جارٍ التحميل...';
+    document.getElementById('loading').classList.add('active');
+}
+function hideLoading() { document.getElementById('loading').classList.remove('active'); }
+
+let _toastTimer = null;
+function toast(msg, type='') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className   = 'show ' + type;
+    if (_toastTimer) clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => { el.className = ''; }, 3200);
+}
+</script>
+</body>
+</html>
